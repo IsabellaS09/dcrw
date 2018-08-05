@@ -73,7 +73,6 @@ const getPage = async (url, mapQuestAPIKey) => {
        geocoder.geocode(restaurantData.address + " " + restaurantData.city + ", " + restaurantData.state, function(err, res){
          restaurantData.lat = res[0].latitude;
          restaurantData.lon = res[0].longitude;
-         restaurants.push(restaurantData)
       })
       
       count++;

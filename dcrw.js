@@ -46,10 +46,10 @@ const getPage = async (url, mapQuestAPIKey) => {
       var thirdBlock = data.children('td.views-field-field-tax-neighborhood');
       restaurantData.neighborhood = thirdBlock.text().trim().split(', ');
       var fourthBlock = data.children('td.views-field-nothing');
-      var lunchMenu = fourthBlock.children('div.brunchbox').children('a').text() === "Brunch Menu";
+      var brunchMenu = fourthBlock.children('div.brunchbox').children('a').text() === "Brunch Menu";
       var lunchMenu = fourthBlock.children('div.lunchbox').children('a').text() === "Lunch Menu";
       var dinnerMenu = fourthBlock.children('div.dinnerbox').children('a').text() === "Dinner Menu";
-      restaurantData.menuOnwebsite = dinnerMenu && lunchMenu;
+      restaurantData.menuOnwebsite = dinnerMenu && lunchMenu && brunchMenu;
       var fifthBlock = data.children('td.views-field-field-mem-opentable-1');
       var brunchRes = fifthBlock.children('div.brunch-reservation-button').length === 1;
       var lunchRes = fifthBlock.children('div.lunch-reservation-button').length === 1;

@@ -116,6 +116,5 @@ const getPage = async (url, mapQuestAPIKey) => {
     return result;
   }
 
-  module.exports = {
-    dcRW
-  }
+  module.exports = dcRW;
+  

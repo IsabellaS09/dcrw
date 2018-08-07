@@ -1,91 +1,116 @@
 var axios = require('axios')
 var cheerio = require('cheerio');
 var NodeGeocoder = require('node-geocoder');
+const yelp = require('yelp-fusion');
+
 
 var restaurants = [];
+var restaurantURLS = [];
+var baseURL = "http://www.ramw.org";
+var yelpURL = "https://api.yelp.com/v3/businesses/search"
 
 var dcRW = {
-  getRestaurants: async (mapQuestAPIKey) => {
-    
-    for(i=0; i < 15; i++){
+  getRestaurants: async (mapQuestAPIKey, yelpAPIKey) => {
+    const client = yelp.client(yelpAPIKey);
+    for(i=0; i < 12; i++){
 
-      var url = "http://www.ramw.org/restaurantweek/list?page="+i;
-      await getPage(url, mapQuestAPIKey);
+      var url = "http://www.ramw.org/restaurantweek?page="+i;
+      await getPage(url);
       
+    }
+    for(i = 0; i < restaurantURLS.length; i++){
+      await getRestaurantData(restaurantURLS[i], mapQuestAPIKey, client)
     }
     return restaurants;
   }
 
 }
 
-const getPage = async (url, mapQuestAPIKey) => {
+const getPage = async (url) => {
   try {
     var response = await axios.get(url);
     $ = cheerio.load(response.data);
     var count = 0;
     var restos = [];
-    restaurantCnt = $("tr.odd,tr.even").length;
-    $("tr.odd,tr.even").filter(function(){
+    restaurantCnt = $("div.views-field.views-field-title").length;
+    $("div.views-field.views-field-title a").filter(function(i, el){
       var data = $(this);
-      var restaurantData = {};
-      var firstBlock = data.children('td.views-field-title');
-
-      restaurantData.name = firstBlock.children('div.pop').text();
-      restaurantData.address = firstBlock.children('div.street-block').children('div.thoroughfare').text();
-      restaurantData.city = firstBlock.children('div.addressfield-container-inline').children("span.locality").text();
-      restaurantData.state = firstBlock.children('div.addressfield-container-inline').children("span.state").text();
-      restaurantData.zipcode =  firstBlock.children('div.addressfield-container-inline').children("span.postal-code").text();
-      if(restaurantData.name.length === 0){
-        return;
-      }
-      var secondBlock = data.children('td.views-field-nothing-1');
-      restaurantData.cuisine = secondBlock.children('p').text().split(', ');
-      restaurantData.brunch = secondBlock.children('div.active.brunch').text() === "Brunch";
-      restaurantData.lunch = secondBlock.children('div.active.lunch').text() === "Lunch";
-      restaurantData.dinner = secondBlock.children('div.active.dinner').text() === "Dinner";
-      var thirdBlock = data.children('td.views-field-field-tax-neighborhood');
-      restaurantData.neighborhood = thirdBlock.text().trim().split(', ');
-      var fourthBlock = data.children('td.views-field-nothing');
-      var brunchMenu = fourthBlock.children('div.brunchbox').children('a').text() === "Brunch Menu";
-      var lunchMenu = fourthBlock.children('div.lunchbox').children('a').text() === "Lunch Menu";
-      var dinnerMenu = fourthBlock.children('div.dinnerbox').children('a').text() === "Dinner Menu";
-      restaurantData.menuOnwebsite = dinnerMenu && lunchMenu && brunchMenu;
-      var fifthBlock = data.children('td.views-field-field-mem-opentable-1');
-      var brunchRes = fifthBlock.children('div.brunch-reservation-button').length === 1;
-      var lunchRes = fifthBlock.children('div.lunch-reservation-button').length === 1;
-      var dinnerRes = fifthBlock.children('div.dinner-reservation-button').length === 1;
-      restaurantData.openTableRes = brunchRes || lunchRes || dinnerRes;
-      if(dinnerRes){
-        restaurantData.openTableID = getJsonFromUrl(fifthBlock.children('div.dinner-reservation-button').children('a').attr('href'))['rid'];
-      } else if(lunchRes) {
-        restaurantData.openTableID = getJsonFromUrl(fifthBlock.children('div.lunch-reservation-button').children('a').attr('href'))['rid'];
-      } else if(brunchRes){
-        restaurantData.openTableID = getJsonFromUrl(fifthBlock.children('div.brunch-reservation-button').children('a').attr('href'))['rid'];
-      }
-
-      var options = {
-        provider: 'mapquest',
-        apiKey: mapQuestAPIKey,
-        formatter: null
-      }
-      
-     var geocoder = NodeGeocoder(options);
-       geocoder.geocode(restaurantData.address + " " + restaurantData.city + ", " + restaurantData.state, function(err, res){
-         restaurantData.lat = res[0].latitude;
-         restaurantData.lon = res[0].longitude;
-      })
-      
-      count++;
-      restos.push(restaurantData);
-      if(count == restaurantCnt){
-        restaurants = restaurants.concat(restos);
-      }
-
+      var link = data.attr('href');
+      restaurantURLS.push(baseURL + link);
     });
 
   } catch (error){
     console.log(error)
   } 
+}
+
+const getRestaurantData = async (url, mapQuestAPIKey, yelpClient) => {
+  var restaurantData = {};
+  try {
+    var response = await axios.get(url);
+    $ = cheerio.load(response.data);
+    var src = $("div.field-content img").attr("src");
+    restaurantData.name = $("h1#restaurantname_tpl").text();
+    restaurantData.logoURL = src;
+    restaurantData.rwURL = url;
+    var street = $("div.street-block .thoroughfare").text()
+    restaurantData.address = street;
+    var city = $("span.locality").text()
+    restaurantData.city = city;
+    var zipcode = $("span.postal-code").text()
+    restaurantData.zipcode = zipcode;
+    var state = $("span.state").text()
+    restaurantData.state = state;
+    restaurantData.brunch = $("div.icon.brunch").hasClass("active");
+    restaurantData.lunch = $("div.icon.lunch").hasClass("active");
+    restaurantData.dinner = $("div.icon.dinner").hasClass("active");
+    var cuisine = []
+    $("div.field-name-field-cuisine div.field-item").filter((i, el) => {
+      var catagory = $(el);
+      cuisine.push(catagory.text())
+    })
+
+    restaurantData.cuisine = cuisine;
+
+    var options = {
+      provider: 'mapquest',
+      apiKey: mapQuestAPIKey,
+      formatter: null
+    }
+    
+    var geocoder = NodeGeocoder(options);
+    geocoder.geocode(restaurantData.address + " " + restaurantData.city + ", " + restaurantData.state, function(err, res){
+      restaurantData.lat = res[0].latitude;
+      restaurantData.lon = res[0].longitude;
+    }) 
+
+    await getYelpData(restaurantData, yelpClient)
+
+  } catch(error){
+    console.log(error)
+  }
+
+}
+
+const getYelpData = async (restaurantData, yelpClient) => {
+  const searchRequest = {
+    term: restaurantData.name,
+    location: `${restaurantData.city.toLowerCase()}, ${restaurantData.state.toLowerCase()}`
+  }
+
+  yelpClient.search(searchRequest).then(response => {
+    const firstResult = response.jsonBody.businesses[0];
+    const prettyJson = JSON.stringify(firstResult, null, 4);
+    if(firstResult){
+      restaurantData.yelpRating = firstResult.rating;
+      restaurantData.priceRange = firstResult.price;
+  
+      restaurants.push(restaurantData)
+    } 
+
+  }).catch(e => {
+    console.log(e);
+  });
 }
  
   function getJsonFromUrl(hashBased) {

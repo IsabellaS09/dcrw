@@ -27,6 +27,7 @@
   "dependencies": {
     "axios": "^0.18.0",
     "cheerio": "^0.20.0",
-    "node-geocoder": "^3.22.0"
+    "node-geocoder": "^3.22.0",
+    "yelp-fusion": "^2.0.3"
   }
 }
